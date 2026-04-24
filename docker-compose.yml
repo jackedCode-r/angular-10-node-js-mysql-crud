@@ -5,7 +5,7 @@ services:
   db:
     image: mysql:8.0
     container_name: mysql_db
-    restart: unless-stopped
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -27,15 +27,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: node_backend
-    restart: unless-stopped
-    environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT}
+    restart: always
+    env_file:
+      - .env                        
     ports:
       - "3000:3000"
     networks:
@@ -49,19 +43,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: angular_frontend
-    restart: unless-stopped
+    restart: always
     ports:
       - "80:80"
     networks:
-      - frontend_network
       - backend_network
     depends_on:
       - backend
 
 networks:
   backend_network:
-    driver: bridge
-  frontend_network:
     driver: bridge
 
 volumes:
