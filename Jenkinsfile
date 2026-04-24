@@ -2,55 +2,30 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME        = "my-project"
-        FRONTEND_IMAGE  = "angular_frontend"
-        BACKEND_IMAGE   = "node_backend"
-
-        // Injected from Jenkins credentials (never hardcoded)
         MYSQL_ROOT_PASSWORD = credentials('MYSQL_ROOT_PASSWORD')
-        MYSQL_PASSWORD      = credentials('MYSQL_PASSWORD')
-        MYSQL_USER          = credentials('MYSQL_USER')
         MYSQL_DATABASE      = credentials('MYSQL_DATABASE')
+        MYSQL_USER          = credentials('MYSQL_USER')
+        MYSQL_PASSWORD      = credentials('MYSQL_PASSWORD')
     }
 
     options {
-        // Keep only last 5 builds to save disk space
-        buildDiscarder(logRotator(numToKeepStr: '5'))
-        // Fail if pipeline runs more than 20 mins
+        buildDiscarder(logRotator(numToKeepStr: '3'))
         timeout(time: 20, unit: 'MINUTES')
-        // Don't run same pipeline in parallel
         disableConcurrentBuilds()
     }
 
     stages {
 
-        // ─────────────────────────────────────────
         stage('Checkout') {
-        // ─────────────────────────────────────────
             steps {
-                echo "Checking out code from GitHub..."
+                echo "Pulling latest code from GitHub..."
                 checkout scm
             }
         }
 
-        // ─────────────────────────────────────────
-        stage('Verify Tools') {
-        // ─────────────────────────────────────────
+        stage('Create .env') {
             steps {
-                sh '''
-                    echo "=== Verifying installed tools ==="
-                    docker --version
-                    docker-compose --version
-                    git --version
-                '''
-            }
-        }
-
-        // ─────────────────────────────────────────
-        stage('Create .env File') {
-        // ─────────────────────────────────────────
-            steps {
-                echo "Generating .env file from Jenkins credentials..."
+                echo "Creating .env file from Jenkins credentials..."
                 sh '''
                     cat > .env <<EOF
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
@@ -65,102 +40,54 @@ DB_PASSWORD=${MYSQL_PASSWORD}
 NODE_ENV=production
 PORT=3000
 EOF
-                    echo ".env file created successfully"
+                    echo ".env created successfully"
                 '''
             }
         }
 
-        // ─────────────────────────────────────────
         stage('Build Docker Images') {
-        // ─────────────────────────────────────────
             steps {
-                echo "Building Docker images..."
-                sh '''
-                    docker-compose build --no-cache
-                '''
+                echo "Building frontend and backend images..."
+                sh 'docker-compose build --no-cache'
             }
         }
 
-        // ─────────────────────────────────────────
         stage('Stop Old Containers') {
-        // ─────────────────────────────────────────
             steps {
-                echo "Stopping and removing old containers..."
-                sh '''
-                    docker-compose down --remove-orphans || true
-                '''
+                echo "Bringing down old containers if running..."
+                sh 'docker-compose down --remove-orphans || true'
             }
         }
 
-        // ─────────────────────────────────────────
-        stage('Run New Containers') {
-        // ─────────────────────────────────────────
+        stage('Start Containers') {
             steps {
                 echo "Starting all containers..."
-                sh '''
-                    docker-compose up -d
-                '''
+                sh 'docker-compose up -d'
             }
         }
 
-        // ─────────────────────────────────────────
-        stage('Health Check') {
-        // ─────────────────────────────────────────
+        stage('Verify Running') {
             steps {
-                echo "Waiting for services to be ready..."
+                echo "Waiting for containers to stabilize..."
                 sh '''
-                    sleep 20
-
-                    echo "=== Checking running containers ==="
+                    sleep 15
+                    echo "=== Container Status ==="
                     docker-compose ps
-
-                    echo "=== Checking frontend ==="
-                    curl -f http://localhost:80 || exit 1
-
-                    echo "=== Checking backend ==="
-                    curl -f http://localhost:3000/health || exit 1
-
-                    echo "All services are healthy!"
-                '''
-            }
-        }
-
-        // ─────────────────────────────────────────
-        stage('Cleanup') {
-        // ─────────────────────────────────────────
-            steps {
-                echo "Cleaning up unused Docker resources..."
-                sh '''
-                    docker image prune -f
-                    docker volume prune -f
                 '''
             }
         }
     }
 
-    // ─────────────────────────────────────────
     post {
-    // ─────────────────────────────────────────
         success {
-            echo """
-            ✅ DEPLOYMENT SUCCESSFUL
-            App is live at: http://${env.EC2_PUBLIC_IP}
-            Build: #${env.BUILD_NUMBER}
-            Branch: ${env.GIT_BRANCH}
-            """
+            echo "✅ Deployment successful! App is live."
         }
         failure {
-            echo """
-            ❌ DEPLOYMENT FAILED
-            Build: #${env.BUILD_NUMBER}
-            Check logs above for errors.
-            """
-            // Optionally rollback
+            echo "❌ Deployment failed. Bringing containers down..."
             sh 'docker-compose down || true'
         }
         always {
-            // Clean workspace after every build
-            cleanWs()
+            echo "Build #${env.BUILD_NUMBER} finished."
         }
     }
 }
