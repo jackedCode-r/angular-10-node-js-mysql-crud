@@ -35,8 +35,7 @@ services:
     networks:
       - backend_network
     depends_on:
-      db:
-        condition: service_healthy    # waits for DB healthcheck to pass
+      - db
     
   frontend:
     build:
