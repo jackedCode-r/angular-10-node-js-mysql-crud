@@ -26,6 +26,7 @@ pipeline {
         stage('Create .env') {
             steps {
                 echo "Creating .env file from Jenkins credentials..."
+                dir('angular-10-node-js-mysql-crud') {
                 sh '''
                     cat > .env <<EOF
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
@@ -42,14 +43,6 @@ PORT=3000
 EOF
                     echo ".env created successfully"
                 '''
-            }
-        }
-
-        stage('Build Docker Images') {
-            steps {
-                echo "Building frontend and backend images..."
-                dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose build --no-cache'
                 }
             }
         }
@@ -59,6 +52,15 @@ EOF
                 echo "Bringing down old containers if running..."
                 dir('angular-10-node-js-mysql-crud') {
                     sh 'docker compose down --remove-orphans || true'
+                }
+            }
+        }
+        
+        stage('Build Docker Images') {
+            steps {
+                echo "Building frontend and backend images..."
+                dir('angular-10-node-js-mysql-crud') {
+                    sh 'docker compose build --no-cache'
                 }
             }
         }
