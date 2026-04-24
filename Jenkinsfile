@@ -51,7 +51,7 @@ EOF
             steps {
                 echo "Bringing down old containers if running..."
                 dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose down --remove-orphans || true'
+                    sh 'docker compose -f docker-compose.yml down --remove-orphans || true'
                 }
             }
         }
@@ -60,7 +60,7 @@ EOF
             steps {
                 echo "Building frontend and backend images..."
                 dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose build --no-cache'
+                    sh 'docker compose -f docker-compose.yml build --no-cache'
                 }
             }
         }
@@ -69,7 +69,7 @@ EOF
             steps {
                 echo "Starting all containers..."
                 dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose up -d'
+                    sh 'docker compose -f docker-compose.yml up -d'
                 }
             }
         }
@@ -81,7 +81,7 @@ EOF
                     sh '''
                         sleep 15
                         echo "=== Container Status ==="
-                        docker compose ps
+                        docker compose -f docker-compose.yml ps
                     '''
                 }
             }
@@ -95,7 +95,7 @@ EOF
         failure {
             echo "❌ Deployment failed. Bringing containers down..."
             dir('angular-10-node-js-mysql-crud') {
-                sh 'docker compose down || true'
+                sh 'docker compose -f docker-compose.yml down || true'
             }
         }
         always {
