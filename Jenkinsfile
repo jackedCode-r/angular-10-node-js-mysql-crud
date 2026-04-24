@@ -26,7 +26,6 @@ pipeline {
         stage('Create .env') {
             steps {
                 echo "Creating .env file from Jenkins credentials..."
-                dir('angular-10-node-js-mysql-crud') {
                 sh '''
                     cat > .env <<EOF
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
@@ -43,47 +42,38 @@ PORT=3000
 EOF
                     echo ".env created successfully"
                 '''
-                }
             }
         }
 
         stage('Stop Old Containers') {
             steps {
                 echo "Bringing down old containers if running..."
-                dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose -f docker-compose.yml down --remove-orphans || true'
-                }
+                    sh 'docker compose --remove-orphans || true'
             }
         }
         
         stage('Build Docker Images') {
             steps {
                 echo "Building frontend and backend images..."
-                dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose -f docker-compose.yml build --no-cache'
-                }
+                    sh 'docker compose build --no-cache'
             }
         }
 
         stage('Start Containers') {
             steps {
                 echo "Starting all containers..."
-                dir('angular-10-node-js-mysql-crud') {
-                    sh 'docker compose -f docker-compose.yml up -d'
-                }
+                    sh 'docker compose up -d'
             }
         }
 
         stage('Verify Running') {
             steps {
                 echo "Waiting for containers to stabilize..."
-                dir('angular-10-node-js-mysql-crud') {
                     sh '''
                         sleep 15
                         echo "=== Container Status ==="
-                        docker compose -f docker-compose.yml ps
+                        docker compose ps
                     '''
-                }
             }
         }
     }
@@ -94,9 +84,7 @@ EOF
         }
         failure {
             echo "❌ Deployment failed. Bringing containers down..."
-            dir('angular-10-node-js-mysql-crud') {
-                sh 'docker compose -f docker-compose.yml down || true'
-            }
+                sh 'docker compose || true'
         }
         always {
             echo "Build #${env.BUILD_NUMBER} finished."
