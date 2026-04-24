@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://your-ec2-public-ip:3000'
+  apiUrl: 'http://65.2.166.1:3000'
 };
