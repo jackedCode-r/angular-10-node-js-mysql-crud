@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files first (better layer caching)
 COPY package*.json ./
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source and build
 COPY . .
