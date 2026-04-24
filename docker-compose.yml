@@ -24,7 +24,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ./node-js-server
       dockerfile: Dockerfile
     container_name: node_backend
     restart: always
@@ -39,7 +39,7 @@ services:
     
   frontend:
     build:
-      context: ./frontend
+      context: ./angular-10-client
       dockerfile: Dockerfile
     container_name: angular_frontend
     restart: always
