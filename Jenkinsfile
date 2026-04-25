@@ -8,12 +8,6 @@ pipeline {
         MYSQL_PASSWORD      = credentials('MYSQL_PASSWORD')
     }
 
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '3'))
-        timeout(time: 20, unit: 'MINUTES')
-        disableConcurrentBuilds()
-    }
-
     stages {
 
         stage('Checkout') {
@@ -70,7 +64,6 @@ EOF
             steps {
                 echo "Waiting for containers to stabilize..."
                     sh '''
-                        sleep 15
                         echo "=== Container Status ==="
                         docker compose ps
                     '''
