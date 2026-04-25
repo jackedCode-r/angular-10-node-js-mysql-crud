@@ -73,7 +73,7 @@ EOF
 
     post {
         success {
-            echo "✅ Deployment successful! App is live."
+            echo "✅ Deployment successful! App is live!"
         }
         failure {
             echo "❌ Deployment failed. Bringing containers down..."
