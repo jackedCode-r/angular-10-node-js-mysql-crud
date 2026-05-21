@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        MYSQL_ROOT_PASSWORD = credentials('MYSQL_ROOT_PASSWORD')
-        MYSQL_DATABASE      = credentials('MYSQL_DATABASE')
-        MYSQL_USER          = credentials('MYSQL_USER')
-        MYSQL_PASSWORD      = credentials('MYSQL_PASSWORD')
+        DOCKER_HUB = "jackedcoder"
+        BACKEND_IMAGE = "${DOCKER_HUB}/node-backend:latest"
+        FRONTEND_IMAGE = "${DOCKER_HUB}/ang-frontend:latest"
     }
 
     stages {
@@ -16,35 +15,6 @@ pipeline {
                 checkout scm
             }
         }
-
-        stage('Create .env') {
-            steps {
-                echo "Creating .env file from Jenkins credentials..."
-                sh '''
-                    cat > .env <<EOF
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-MYSQL_DATABASE=${MYSQL_DATABASE}
-MYSQL_USER=${MYSQL_USER}
-MYSQL_PASSWORD=${MYSQL_PASSWORD}
-DB_HOST=db
-DB_PORT=3306
-DB_NAME=${MYSQL_DATABASE}
-DB_USER=${MYSQL_USER}
-DB_PASSWORD=${MYSQL_PASSWORD}
-NODE_ENV=production
-PORT=3000
-EOF
-                    echo ".env created successfully"
-                '''
-            }
-        }
-
-        stage('Stop Old Containers') {
-            steps {
-                echo "Bringing down old containers if running..."
-                    sh 'docker compose --remove-orphans || true'
-            }
-        }
         
         stage('Build Docker Images') {
             steps {
@@ -53,34 +23,88 @@ EOF
             }
         }
 
-        stage('Start Containers') {
+        stage('DockerHub Login') {
             steps {
-                echo "Starting all containers..."
-                    sh 'docker compose up -d'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
             }
         }
 
-        stage('Verify Running') {
+        stage('Push Backend Image') {
             steps {
-                echo "Waiting for containers to stabilize..."
-                    sh '''
-                        echo "=== Container Status ==="
-                        docker compose ps
-                    '''
+                sh 'docker push $BACKEND_IMAGE'
             }
         }
+
+        stage('Push Frontend Image') {
+            steps {
+                sh 'docker push $FRONTEND_IMAGE'
+            }
+        }
+
+        stage('Deploy MySQL Resources') {
+            steps {
+                sh '''
+                kubectl apply -f deployment/mysql-secret.yml
+                kubectl apply -f deployment/mysql-pvc.yml
+                kubectl apply -f deployment/mysql-service.yml
+                kubectl apply -f deployment/mysql-statefulset.yml
+                '''
+            }
+        }
+
+        stage('Deploy Backend') {
+            steps {
+                sh '''
+                kubectl apply -f deployment/backend-deployment.yml
+                kubectl apply -f deployment/backend-service.yml
+                '''
+            }
+        }
+
+        stage('Deploy Frontend') {
+            steps {
+                sh '''
+                kubectl apply -f deployment/frontend-deployment.yml
+                kubectl apply -f deployment/frontend-service.yml
+                '''
+            }
+        }
+
+        stage('Deploy Ingress') {
+            steps {
+                sh '''
+                kubectl apply -f deployment/ingress.yml
+                '''
+            }
+        }
+
+        stage('Restart Deployments') {
+            steps {
+                sh '''
+                kubectl rollout restart deployment backend-deployment -n mean-app
+                kubectl rollout restart deployment frontend-deployment -n mean-app
+                '''
+            }
+        }
+
     }
 
     post {
         success {
-            echo "✅ Deployment successful! App is live!"
+            echo 'Pipeline executed successfully!'
         }
+
         failure {
-            echo "❌ Deployment failed. Bringing containers down..."
-                sh 'docker compose || true'
-        }
-        always {
-            echo "Build #${env.BUILD_NUMBER} finished."
+            echo 'Pipeline failed!'
         }
     }
 }
