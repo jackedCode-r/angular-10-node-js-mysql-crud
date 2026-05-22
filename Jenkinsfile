@@ -22,7 +22,7 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 echo "Building frontend and backend images..."
-                    sh 'docker compose build --no-cache'
+                    sh 'docker compose build'
             }
         }
 
