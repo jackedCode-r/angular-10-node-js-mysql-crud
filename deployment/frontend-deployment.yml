@@ -18,6 +18,7 @@ spec:
       labels:
         app: frontend
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
       - name: ang-frontend
         image: jackedcoder/ang-frontend:IMAGE_TAG

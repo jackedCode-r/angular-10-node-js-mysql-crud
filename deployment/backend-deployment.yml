@@ -18,6 +18,7 @@ spec:
       labels:
         app: backend
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
       - name: node-backend
         image: jackedcoder/node-backend:IMAGE_TAG

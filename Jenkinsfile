@@ -110,7 +110,7 @@ pipeline {
                 kubectl apply -f deployment/mysql-pvc.yml -n $NAMESPACE
                 kubectl apply -f deployment/mysql-statefulset.yml -n $NAMESPACE
                 kubectl apply -f deployment/mysql-service.yml -n $NAMESPACE
-                kubectl rollout status statefulset/mysql -n $NAMESPACE --timeout=120s
+                kubectl rollout status statefulset/mysql -n $NAMESPACE --timeout=300s
                 '''
             }
         }
@@ -120,7 +120,7 @@ pipeline {
                 sh '''
                 kubectl apply -f deployment/backend-deployment.yml -n $NAMESPACE
                 kubectl apply -f deployment/backend-service.yml -n $NAMESPACE
-                kubectl rollout status deployment/backend-deployment -n $NAMESPACE --timeout=120s
+                kubectl rollout status deployment/backend-deployment -n $NAMESPACE --timeout=300s
                 '''
             }
         }
@@ -130,7 +130,7 @@ pipeline {
                 sh '''
                 kubectl apply -f deployment/frontend-deployment.yml -n $NAMESPACE
                 kubectl apply -f deployment/frontend-service.yml -n $NAMESPACE
-                kubectl rollout status deployment/frontend-deployment -n $NAMESPACE --timeout=120s
+                kubectl rollout status deployment/frontend-deployment -n $NAMESPACE --timeout=300s
                 '''
             }
         }
