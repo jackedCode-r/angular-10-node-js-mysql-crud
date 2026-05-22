@@ -21,7 +21,7 @@ pipeline {
         
         stage('Build Docker Images') {
             steps {
-                echo "Building frontend and backend images..."
+                echo "Building frontend and backend images"
                     sh 'docker build -t $BACKEND_IMAGE ./node-js-server'
                     sh 'docker build -t $FRONTEND_IMAGE ./angular-10-client'
             }
