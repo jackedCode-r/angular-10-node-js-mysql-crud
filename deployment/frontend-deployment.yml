@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: ang-frontend
-        image: jackedcoder/ang-frontend:latest
+        image: jackedcoder/ang-frontend:IMAGE_TAG
         ports:
         - containerPort: 80
         resources:

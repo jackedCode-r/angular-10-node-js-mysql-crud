@@ -3,8 +3,9 @@ pipeline {
 
     environment {
         DOCKER_HUB = "jackedcoder"
-        BACKEND_IMAGE = "${DOCKER_HUB}/node-backend:latest"
-        FRONTEND_IMAGE = "${DOCKER_HUB}/ang-frontend:latest"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        BACKEND_IMAGE = "${DOCKER_HUB}/node-backend:${IMAGE_TAG}"
+        FRONTEND_IMAGE = "${DOCKER_HUB}/ang-frontend:${IMAGE_TAG}"
         CLUSTER_NAME = "mean-app-cluster"
         REGION = "ap-south-1"
         NAMESPACE = "mean-app"
@@ -89,6 +90,15 @@ pipeline {
                     else
                         kubectl create namespace $NAMESPACE
                     fi
+                '''
+            }
+        }
+
+        stage('Update Kubernetes Manifests') {
+            steps {
+                sh '''
+                sed -i "s|IMAGE_TAG|${BUILD_NUMBER}|g" deployment/backend-deployment.yml
+                sed -i "s|IMAGE_TAG|${BUILD_NUMBER}|g" deployment/frontend-deployment.yml
                 '''
             }
         }

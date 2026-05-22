@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: node-backend
-        image: jackedcoder/node-backend:latest
+        image: jackedcoder/node-backend:IMAGE_TAG
         ports:
         - containerPort: 3000
         resources:
