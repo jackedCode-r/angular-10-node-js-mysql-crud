@@ -5,6 +5,9 @@ pipeline {
         DOCKER_HUB = "jackedcoder"
         BACKEND_IMAGE = "${DOCKER_HUB}/node-backend:latest"
         FRONTEND_IMAGE = "${DOCKER_HUB}/ang-frontend:latest"
+        CLUSTER_NAME = "mean-app-cluster"
+        REGION = "ap-south-1"
+        NAMESPACE = "mean-app"
     }
 
     stages {
@@ -50,13 +53,53 @@ pipeline {
             }
         }
 
+        stage('Create EKS Cluster') {
+            steps {
+                sh '''
+                    if eksctl get cluster --name $CLUSTER_NAME --region $REGION 2>/dev/null; then
+                        echo "Cluster already exists, skipping creation"
+                    else
+                        echo "Creating EKS Cluster..."
+                        eksctl create cluster \
+                            --name $CLUSTER_NAME \
+                            --region $REGION \
+                            --nodegroup-name mean-app-nodes \
+                            --node-type t3.small \
+                            --nodes 2 \
+                            --nodes-min 1 \
+                            --nodes-max 4 \
+                            --managed
+                    fi
+                '''
+            }
+        }
+
+        stage('Configure kubectl') {
+            steps {
+                sh 'aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME'
+            }
+        }
+
+        stage('Create Namespace') {
+            steps {
+                sh '''
+                    if kubectl get namespace $NAMESPACE 2>/dev/null; then
+                        echo "Namespace already exists, skipping"
+                    else
+                        kubectl create namespace $NAMESPACE
+                    fi
+                '''
+            }
+        }
+
         stage('Deploy MySQL Resources') {
             steps {
                 sh '''
                 kubectl apply -f deployment/mysql-secret.yml
                 kubectl apply -f deployment/mysql-pvc.yml
-                kubectl apply -f deployment/mysql-service.yml
                 kubectl apply -f deployment/mysql-statefulset.yml
+                kubectl apply -f deployment/mysql-service.yml
+                kubectl rollout status statefulset/mysql -n $NAMESPACE --timeout=120s
                 '''
             }
         }
@@ -66,6 +109,7 @@ pipeline {
                 sh '''
                 kubectl apply -f deployment/backend-deployment.yml
                 kubectl apply -f deployment/backend-service.yml
+                kubectl rollout status deployment/backend-deployment -n $NAMESPACE --timeout=120s
                 '''
             }
         }
@@ -75,6 +119,7 @@ pipeline {
                 sh '''
                 kubectl apply -f deployment/frontend-deployment.yml
                 kubectl apply -f deployment/frontend-service.yml
+                kubectl rollout status deployment/frontend-deployment -n $NAMESPACE --timeout=120s
                 '''
             }
         }
@@ -90,8 +135,8 @@ pipeline {
         stage('Restart Deployments') {
             steps {
                 sh '''
-                kubectl rollout restart deployment backend-deployment -n mean-app
-                kubectl rollout restart deployment frontend-deployment -n mean-app
+                kubectl rollout restart deployment/backend-deployment -n $NAMESPACE
+                kubectl rollout restart deployment/frontend-deployment -n $NAMESPACE
                 '''
             }
         }
