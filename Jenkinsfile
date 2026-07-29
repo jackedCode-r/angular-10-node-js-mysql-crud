@@ -103,15 +103,43 @@ pipeline {
             }
         }
 
-        stage('Deploy MySQL Resources') {
+        stage('Provision RDS') {
             steps {
-                sh '''
-                kubectl apply -f deployment/mysql-secret.yml -n $NAMESPACE
-                kubectl apply -f deployment/mysql-pvc.yml -n $NAMESPACE
-                kubectl apply -f deployment/mysql-statefulset.yml -n $NAMESPACE
-                kubectl apply -f deployment/mysql-service.yml -n $NAMESPACE
-                kubectl rollout status statefulset/mysql -n $NAMESPACE --timeout=300s
-                '''
+                withCredentials([usernamePassword(
+                    credentialsId: 'rds-db-creds',
+                    usernameVariable: 'DB_USER',
+                    passwordVariable: 'DB_PASS'
+                )]) {
+                    sh '''
+                    if aws rds describe-db-instances --db-instance-identifier mean-app-db --region $REGION 2>/dev/null; then
+                        echo "RDS instance already exists, skipping creation"
+                    else
+                        echo "Creating RDS instance..."
+                        aws rds create-db-instance \
+                            --db-instance-identifier mean-app-db \
+                            --db-instance-class db.t3.micro \
+                            --engine mysql \
+                            --master-username $DB_USER \
+                            --master-user-password $DB_PASS \
+                            --allocated-storage 20 \
+                            --backup-retention-period 1 \
+                            --no-multi-az \
+                            --publicly-accessible \
+                            --region $REGION
+                        aws rds wait db-instance-available --db-instance-identifier mean-app-db --region $REGION
+                    fi
+        
+                    DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier mean-app-db --region $REGION --query "DBInstances[0].Endpoint.Address" --output text)
+        
+                    kubectl delete secret rds-secret -n $NAMESPACE --ignore-not-found
+                    kubectl create secret generic rds-secret \
+                        --from-literal=DB_HOST=$DB_ENDPOINT \
+                        --from-literal=DB_USER=$DB_USER \
+                        --from-literal=DB_PASSWORD=$DB_PASS \
+                        --from-literal=DB_NAME=meanapp \
+                        -n $NAMESPACE
+                    '''
+                }
             }
         }
 
