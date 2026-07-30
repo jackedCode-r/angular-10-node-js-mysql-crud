@@ -103,6 +103,69 @@ pipeline {
             }
         }
 
+        stage('Install ALB Controller') {
+            steps {
+                sh '''
+                eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --region $REGION --approve
+        
+                if aws iam get-policy --policy-arn arn:aws:iam::766691179872:policy/AWSLoadBalancerControllerIAMPolicy 2>/dev/null; then
+                    echo "IAM policy already exists, skipping creation"
+                else
+                    curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.2/docs/install/iam_policy.json
+                    aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy --policy-document file://iam_policy.json
+                fi
+        
+                eksctl create iamserviceaccount \
+                    --cluster=$CLUSTER_NAME \
+                    --namespace=kube-system \
+                    --name=aws-load-balancer-controller \
+                    --region $REGION \
+                    --attach-policy-arn=arn:aws:iam::766691179872:policy/AWSLoadBalancerControllerIAMPolicy \
+                    --override-existing-serviceaccounts \
+                    --approve
+        
+                cat <<EOF > extra-permissions.json
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": ["elasticloadbalancing:DescribeListenerAttributes"],
+                      "Resource": "*"
+                    }
+                  ]
+                }
+                EOF
+        
+                ROLE_NAME=$(aws iam list-roles --query "Roles[?contains(RoleName, 'addon-iamserviceaccou')].RoleName" --output text)
+                aws iam put-role-policy --role-name $ROLE_NAME --policy-name ALBExtraPermissions --policy-document file://extra-permissions.json
+        
+                if ! command -v helm &> /dev/null; then
+                    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+                fi
+        
+                helm repo add eks https://aws.github.io/eks-charts
+                helm repo update
+        
+                VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query "cluster.resourcesVpcConfig.vpcId" --output text)
+        
+                if helm status aws-load-balancer-controller -n kube-system 2>/dev/null; then
+                    echo "ALB controller already installed, skipping"
+                else
+                    helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+                        -n kube-system \
+                        --set clusterName=$CLUSTER_NAME \
+                        --set serviceAccount.create=false \
+                        --set serviceAccount.name=aws-load-balancer-controller \
+                        --set region=$REGION \
+                        --set vpcId=$VPC_ID
+                fi
+        
+                kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=180s
+                '''
+            }
+        }
+        
         stage('Provision RDS') {
             steps {
                 withCredentials([usernamePassword(
@@ -167,6 +230,23 @@ pipeline {
             steps {
                 sh '''
                 kubectl apply -f deployment/ingress.yml -n $NAMESPACE
+                '''
+            }
+        }
+
+        stage('Get ALB URL') {
+            steps {
+                sh '''
+                echo "Waiting for ALB to be provisioned..."
+                for i in $(seq 1 20); do
+                    ALB_DNS=$(kubectl get ingress mean-app-ingress -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+                    if [ -n "$ALB_DNS" ]; then
+                        echo "Your app is live at: http://$ALB_DNS"
+                        break
+                    fi
+                    echo "ALB not ready yet, retrying in 15s..."
+                    sleep 15
+                done
                 '''
             }
         }
