@@ -252,7 +252,7 @@ pipeline {
             steps {
                 sh '''
                 terraform -chdir=terraform-infra init
-                ALB_ROLE_ARN=$(terraform -chdir=terraform-infra output -raw alb_controller_role_arn)
+                ALB_ROLE_ARN="arn:aws:iam::766691179872:role/eks-alb-controller-role"
                 cat <<EOF | kubectl apply -f -
                 apiVersion: v1
                 kind: ServiceAccount
