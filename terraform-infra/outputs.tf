@@ -9,3 +9,7 @@ output "rds_endpoint" {
 output "vpc_id" {
   value = data.aws_vpc.default.id
 }
+
+output "alb_controller_role_arn" {
+  value = aws_iam_role.alb_controller.arn
+}
