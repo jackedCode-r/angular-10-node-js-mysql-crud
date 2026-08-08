@@ -251,33 +251,37 @@ pipeline {
         stage('Deploy ALB Controller') {
             steps {
                 sh '''
-                terraform -chdir=terraform-infra init
-                ALB_ROLE_ARN="arn:aws:iam::766691179872:role/eks-alb-controller-role"
-                cat <<EOF | kubectl apply -f -
-                apiVersion: v1
-                kind: ServiceAccount
-                metadata:
-                name: aws-load-balancer-controller
-                namespace: kube-system
-                annotations:
-                    eks.amazonaws.com/role-arn: ${ALB_ROLE_ARN}
-                EOF
-                helm repo add eks https://aws.github.io/eks-charts
-                helm repo update
-                VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query "cluster.resourcesVpcConfig.vpcId" --output text)
-                if helm status aws-load-balancer-controller -n kube-system 2>/dev/null; then
-                    echo "ALB controller already installed, skipping"
-                else
-                    helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-                        -n kube-system \
-                        --set clusterName=$CLUSTER_NAME \
-                        --set serviceAccount.create=false \
-                        --set serviceAccount.name=aws-load-balancer-controller \
-                        --set region=$REGION \
-                        --set vpcId=$VPC_ID
-                fi
-                kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=180s
-                '''
+        ALB_ROLE_ARN="arn:aws:iam::766691179872:role/eks-alb-controller-role"
+
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+        name: aws-load-balancer-controller
+        namespace: kube-system
+        annotations:
+            eks.amazonaws.com/role-arn: ${ALB_ROLE_ARN}
+        EOF
+
+        helm repo add eks https://aws.github.io/eks-charts
+        helm repo update
+
+        VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query "cluster.resourcesVpcConfig.vpcId" --output text)
+
+        if helm status aws-load-balancer-controller -n kube-system 2>/dev/null; then
+            echo "ALB controller already installed, skipping"
+        else
+            helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+                -n kube-system \
+                --set clusterName=$CLUSTER_NAME \
+                --set serviceAccount.create=false \
+                --set serviceAccount.name=aws-load-balancer-controller \
+                --set region=$REGION \
+                --set vpcId=$VPC_ID
+        fi
+
+        kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=180s
+        '''
             }
         }
 
