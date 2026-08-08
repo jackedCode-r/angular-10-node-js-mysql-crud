@@ -1,3 +1,7 @@
 .env
 node_modules
 dist
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
