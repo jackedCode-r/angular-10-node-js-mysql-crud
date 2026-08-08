@@ -251,8 +251,8 @@ pipeline {
         stage('Deploy ALB Controller') {
             steps {
                 sh '''
+                terraform -chdir=terraform-infra init
                 ALB_ROLE_ARN=$(terraform -chdir=terraform-infra output -raw alb_controller_role_arn)
-
                 cat <<EOF | kubectl apply -f -
                 apiVersion: v1
                 kind: ServiceAccount
@@ -262,12 +262,9 @@ pipeline {
                 annotations:
                     eks.amazonaws.com/role-arn: ${ALB_ROLE_ARN}
                 EOF
-
                 helm repo add eks https://aws.github.io/eks-charts
                 helm repo update
-
                 VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query "cluster.resourcesVpcConfig.vpcId" --output text)
-
                 if helm status aws-load-balancer-controller -n kube-system 2>/dev/null; then
                     echo "ALB controller already installed, skipping"
                 else
@@ -279,7 +276,6 @@ pipeline {
                         --set region=$REGION \
                         --set vpcId=$VPC_ID
                 fi
-
                 kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=180s
                 '''
             }

@@ -56,3 +56,19 @@ resource "aws_iam_role_policy" "alb_extra" {
     }]
   })
 }
+
+resource "aws_eks_access_entry" "jenkins" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::766691179872:role/admin-role"
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "jenkins_admin" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::766691179872:role/admin-role"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+}
